@@ -1,0 +1,60 @@
+{
+"leaseInput": {
+                "panels": 12, 
+                "prePayment": "0.00", 
+                "solarYield": 1372.9641483516484, 
+                "cfeCustomer": 
+                    {
+                      "month": 4, 
+                      "tarifa": "1-sur_y_peninsular", 
+                      "dapRate": 0.08, 
+                      "ivaRate": 0.16
+                      }, 
+                "targetPrice": null, 
+                "assumeNonDac": true, 
+                "exchangeRate": 20.215390621332215, 
+                "HistoricalUse": 
+                    [
+                    {"kwh": 535.5, "period": "2021-04"}, 
+                    {"kwh": 634.5, "period": "2021-05"}, 
+                    {"kwh": 634.5, "period": "2021-06"}, 
+                    {"kwh": 872, "period": "2021-07"}, 
+                    {"kwh": 872, "period": "2021-08"}, 
+                    {"kwh": 967, "period": "2021-09"}, 
+                    {"kwh": 967, "period": "2021-10"}, 
+                    {"kwh": 729.5, "period": "2021-11"}, 
+                    {"kwh": 729.5, "period": "2021-12"}, 
+                    {"kwh": 446.5, "period": "2022-01"}, 
+                    {"kwh": 446.5, "period": "2022-02"}, 
+                    {"kwh": 535.5, "period": "2022-03"}
+                    ], 
+                "targetSavings": 0, 
+                "wattsPerPanel": 455, 
+                "prepaymentMonths": 0
+                  }, 
+"proposalRequest": 
+                {
+                  "data": {
+                          "type": "subscription", 
+                          "panels": 12, 
+                          "phases": 2, 
+                          "tarifa": "1-sur_y_peninsular", 
+                          "postalCode": "76904", 
+                          "solarYield": 1372.9641483516484, 
+                          "targetSavings": 0, 
+                          "consumptionJanFeb": 893, 
+                          "consumptionJulAug": 1744, 
+                          "consumptionMarApr": 1071, 
+                          "consumptionMayJun": 1269, 
+                          "consumptionNovDec": 1459, 
+                          "consumptionSepOct": 1934, 
+                          "targetSavingsTarifa": "t1", 
+                          "disableConsumptionMonitoring": true
+                          }, 
+                    "type": "proposalRequest", 
+                   "leadId": "3044337941436265803", 
+                   "createdAt": "2022-04-12T22:53:15.339031Z", 
+                   "leadDocId": "2061492145754030976", 
+                   "submittingUserId": "1467791284079394102"
+                 }                  
+ }
