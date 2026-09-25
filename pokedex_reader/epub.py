@@ -20,6 +20,7 @@ NS = {
     "opf": "http://www.idpf.org/2007/opf",
     "dc": "http://purl.org/dc/elements/1.1/",
 }
+NCX = {"n": "http://www.daisy.org/z3986/2005/ncx/"}
 
 HEADINGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
 BLOCKS = {"p", "div", "li", "blockquote", "pre", "tr", "dt", "dd", "br",
@@ -46,13 +47,18 @@ class Book:
                 opf_path = container.find(".//c:rootfile", NS).get("full-path")
                 opf = ElementTree.fromstring(z.read(opf_path))
             base = posixpath.dirname(opf_path)
-            manifest = {item.get("id"): item.get("href")
-                        for item in opf.find("opf:manifest", NS)}
+            items = list(opf.find("opf:manifest", NS))
+            manifest = {item.get("id"): _join(base, item.get("href")) for item in items}
+            spine = opf.find("opf:spine", NS)
             self.chapter_files = [
-                posixpath.normpath(posixpath.join(base, unquote(manifest[ref.get("idref")])))
-                for ref in opf.find("opf:spine", NS)
+                manifest[ref.get("idref")] for ref in spine
                 if ref.get("idref") in manifest and ref.get("linear") != "no"
             ]
+            # EPUB 3 marks its table of contents with properties="nav";
+            # EPUB 2 points at an NCX file from the spine.
+            self._nav_file = next((manifest[item.get("id")] for item in items
+                                   if "nav" in (item.get("properties") or "").split()), None)
+            self._ncx_file = manifest.get(spine.get("toc"))
         except (OSError, KeyError, AttributeError, TypeError,
                 zipfile.BadZipFile, ElementTree.ParseError) as e:
             raise EpubError(f"{self.path.name}: {e}") from e
@@ -60,24 +66,111 @@ class Book:
         self.title = _text(opf.find(".//dc:title", NS)) or self.path.stem
         self.author = _text(opf.find(".//dc:creator", NS))
         self._chapters: dict[int, list[Block]] = {}
+        self._toc: list[TocEntry] | None = None
 
     def chapter(self, index: int) -> list[Block]:
         """The text blocks of one chapter, parsed on first use."""
         if index not in self._chapters:
-            try:
-                with zipfile.ZipFile(self.path) as z:
-                    html = z.read(self.chapter_files[index]).decode("utf-8", errors="replace")
-            except KeyError:
-                html = ""  # spine entry points at a missing file
             parser = _TextExtractor()
-            parser.feed(html)
+            parser.feed(self._read(self.chapter_files[index]))
             parser.close()
             self._chapters[index] = parser.blocks
         return self._chapters[index]
 
+    def toc(self) -> list[TocEntry]:
+        """The book's table of contents, or one entry per chapter with text."""
+        if self._toc is None:
+            self._toc = self._read_toc() or [
+                TocEntry(_chapter_title(blocks), i)
+                for i in range(len(self.chapter_files)) if (blocks := self.chapter(i))
+            ]
+        return self._toc
+
+    def _read_toc(self) -> list[TocEntry]:
+        if self._nav_file:
+            parser = _NavExtractor()
+            parser.feed(self._read(self._nav_file))
+            parser.close()
+            links, base = parser.links, posixpath.dirname(self._nav_file)
+        elif self._ncx_file:
+            try:
+                ncx = ElementTree.fromstring(self._read(self._ncx_file))
+            except ElementTree.ParseError:
+                return []
+            links = [(_text(point.find("n:navLabel/n:text", NCX)),
+                      point.find("n:content", NCX).get("src", ""))
+                     for point in ncx.iter(f"{{{NCX['n']}}}navPoint")
+                     if point.find("n:content", NCX) is not None]
+            base = posixpath.dirname(self._ncx_file)
+        else:
+            return []
+        entries = []
+        for title, href in links:
+            file = _join(base, href.split("#")[0])
+            if title and file in self.chapter_files:
+                entry = TocEntry(title, self.chapter_files.index(file))
+                if entry not in entries:
+                    entries.append(entry)
+        return entries
+
+    def _read(self, name: str) -> str:
+        try:
+            with zipfile.ZipFile(self.path) as z:
+                return z.read(name).decode("utf-8", errors="replace")
+        except KeyError:
+            return ""  # the book points at a file it doesn't contain
+
+
+@dataclass(frozen=True)
+class TocEntry:
+    title: str
+    chapter: int
+
+
+def _join(base: str, href: str) -> str:
+    return posixpath.normpath(posixpath.join(base, unquote(href)))
+
 
 def _text(element) -> str:
     return " ".join((element.text or "").split()) if element is not None else ""
+
+
+def _chapter_title(blocks: list[Block]) -> str:
+    """A name for a chapter in a book without a table of contents."""
+    for block in blocks:
+        if block.kind == "heading":
+            return block.text
+    words = blocks[0].text.split()
+    return " ".join(words[:6]) + ("\u2026" if len(words) > 6 else "")
+
+
+class _NavExtractor(HTMLParser):
+    """Collects (title, href) of the links inside <nav epub:type="toc">."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.links: list[tuple[str, str]] = []
+        self._nav_depth = 0  # >0 while inside the toc <nav>
+        self._href: str | None = None
+        self._title: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "nav" and (self._nav_depth or "toc" in (attrs.get("epub:type") or "").split()):
+            self._nav_depth += 1
+        elif tag == "a" and self._nav_depth:
+            self._href, self._title = attrs.get("href") or "", []
+
+    def handle_endtag(self, tag):
+        if tag == "nav" and self._nav_depth:
+            self._nav_depth -= 1
+        elif tag == "a" and self._href is not None:
+            self.links.append((" ".join("".join(self._title).split()), self._href))
+            self._href = None
+
+    def handle_data(self, data):
+        if self._href is not None:
+            self._title.append(data)
 
 
 class _TextExtractor(HTMLParser):

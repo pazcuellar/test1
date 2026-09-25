@@ -3,7 +3,9 @@
 from pokedex_reader.device import Button
 from pokedex_reader.layout import Position
 from pokedex_reader.progress import ProgressStore
-from pokedex_reader.screens import Context, LibraryScreen, ReaderScreen, start_screen
+from pokedex_reader.screens import (
+    DEFAULT_FONT_SIZE, FONT_SIZES, ContentsScreen, Context, LibraryScreen, MenuScreen, ReaderScreen,
+    start_screen)
 
 
 def make_ctx(books_dir, state_path):
@@ -73,3 +75,49 @@ def test_last_page_of_book_stays_put(books_dir, tmp_path):
 def test_empty_library_renders(tmp_path):
     screen = start_screen(make_ctx(tmp_path, tmp_path / "p.json"))
     assert press(screen, Button.A, Button.DOWN).render().size == (300, 400)
+
+
+def test_font_size_keeps_your_place_and_is_remembered(books_dir, tmp_path):
+    state = tmp_path / "p.json"
+    screen = press(start_screen(make_ctx(books_dir, state)), Button.A, Button.RIGHT, Button.RIGHT)
+    reader = screen
+    words_at_top = reader.pages(reader.chapter)[reader.page].start
+    small_pages = len(reader.pages(reader.chapter))
+
+    menu = press(reader, Button.A)
+    assert isinstance(menu, MenuScreen)
+    press(menu, Button.RIGHT, Button.RIGHT)  # two sizes bigger
+    assert reader.font_size == DEFAULT_FONT_SIZE + 2
+    assert len(reader.pages(reader.chapter)) > small_pages
+
+    def shows_words_at_top():
+        """The page shown still contains the text that was at the top before."""
+        pages = reader.pages(reader.chapter)
+        return pages[reader.page].start <= words_at_top and (
+            reader.page == len(pages) - 1 or pages[reader.page + 1].start > words_at_top)
+
+    assert shows_words_at_top()
+    # Going up to the biggest size and back down doesn't lose your place.
+    press(menu, *[Button.RIGHT] * 10)
+    assert reader.font_size == len(FONT_SIZES) - 1
+    assert shows_words_at_top()
+    press(menu, *[Button.LEFT] * 10)
+    assert reader.font_size == 0
+    assert shows_words_at_top()
+    press(menu, *[Button.RIGHT] * 10)
+    assert press(menu, Button.B) is reader
+
+    assert ReaderScreen(make_ctx(books_dir, state), "a.epub", reader.book).font_size == len(FONT_SIZES) - 1
+
+
+def test_contents_jumps_to_a_chapter(books_dir, tmp_path):
+    screen = press(start_screen(make_ctx(books_dir, tmp_path / "p.json")), Button.DOWN, Button.A)
+    assert screen.chapter == 1
+    contents = press(screen, Button.A, Button.DOWN, Button.A)  # menu -> Contents
+    assert isinstance(contents, ContentsScreen)
+    assert [e.title for e in contents.entries] == ["One", "Two"]
+    assert contents.selected == 0, "starts on the current chapter"
+    reader = press(contents, Button.DOWN, Button.A)
+    assert reader is screen
+    assert (reader.chapter, reader.page) == (2, 0)
+    assert isinstance(press(reader, Button.A, Button.DOWN, Button.DOWN, Button.A), LibraryScreen)

@@ -41,3 +41,20 @@ def test_broken_file_raises_epub_error(tmp_path):
     path.write_text("not a zip")
     with pytest.raises(EpubError):
         Book(path)
+
+
+@pytest.mark.parametrize("kind", ["nav", "ncx"])
+def test_table_of_contents(tmp_path, kind):
+    book = Book(make_epub(tmp_path / "x.epub", "T", "A", ["<p>a</p>", "<p>b</p>", "<p>c</p>"],
+                          toc=kind, toc_titles=["Start", "Middle", "End"]))
+    assert [(e.title, e.chapter) for e in book.toc()] == [("Start", 0), ("Middle", 1), ("End", 2)]
+
+
+def test_contents_without_a_toc_uses_headings_or_first_words(tmp_path):
+    book = Book(make_epub(tmp_path / "x.epub", "T", "A", [
+        '<img src="cover.jpg"/>',
+        "<h2>The Beginning</h2><p>text</p>",
+        "<p>one two three four five six seven eight</p>",
+    ]))
+    assert [(e.title, e.chapter) for e in book.toc()] == [
+        ("The Beginning", 1), ("one two three four five six…", 2)]

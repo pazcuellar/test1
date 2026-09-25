@@ -1,4 +1,4 @@
-"""Remembering the current page of each book, and the last book open."""
+"""Remembering the current page of each book, the last book open, and settings."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ class ProgressStore:
             data = {}
         self.last_book: str | None = data.get("last_book")
         self._positions: dict[str, list[int]] = data.get("books", {})
+        self._settings: dict = data.get("settings", {})
 
     def position(self, book: str) -> Position | None:
         saved = self._positions.get(book)
@@ -26,6 +27,13 @@ class ProgressStore:
     def save(self, book: str, position: Position) -> None:
         self.last_book = book
         self._positions[book] = [position.chapter, position.block, position.word]
+        self._write()
+
+    def setting(self, key: str, default):
+        return self._settings.get(key, default)
+
+    def set_setting(self, key: str, value) -> None:
+        self._settings[key] = value
         self._write()
 
     def forget_last_book(self) -> None:
@@ -37,5 +45,6 @@ class ProgressStore:
         # mid-write can't leave a half-written file behind.
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"last_book": self.last_book, "books": self._positions}))
+        tmp.write_text(json.dumps({"last_book": self.last_book, "books": self._positions,
+                                   "settings": self._settings}))
         os.replace(tmp, self.path)

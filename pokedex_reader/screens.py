@@ -1,4 +1,4 @@
-"""The library and reading screens.
+"""The library, reading, menu and contents screens.
 
 Each screen draws itself as an image and reacts to a button by returning
 the screen to show next (itself, to stay).
@@ -21,6 +21,8 @@ from .progress import ProgressStore
 MARGIN = 16
 HEADER = 44
 FOOTER = 22
+FONT_SIZES = (14, 17, 20, 24, 28)
+DEFAULT_FONT_SIZE = 1  # index into FONT_SIZES
 
 
 @dataclass
@@ -60,6 +62,20 @@ def start_screen(ctx: Context):
     return LibraryScreen(ctx)
 
 
+def draw_header(ctx: Context, draw: ImageDraw.ImageDraw, title: str) -> None:
+    draw.rectangle([0, 0, ctx.width, HEADER - 1], fill=BLACK)
+    # The big blue lens and the three small lights of the Kanto Pokédex.
+    cx, cy, r = 24, HEADER // 2, 14
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=WHITE)
+    draw.ellipse([cx - r + 3, cy - r + 3, cx + r - 3, cy + r - 3], fill=LIGHT)
+    draw.ellipse([cx - 7, cy - 8, cx - 2, cy - 3], fill=WHITE)
+    for i, shade in enumerate((WHITE, LIGHT, DARK)):
+        x = 48 + i * 11
+        draw.ellipse([x, 8, x + 6, 14], fill=shade, outline=WHITE)
+    draw.text((48, HEADER - 8), _fit(title, ctx.title_font, ctx.width - 48 - MARGIN),
+              font=ctx.title_font, fill=WHITE, anchor="ls")
+
+
 def draw_footer(ctx: Context, draw: ImageDraw.ImageDraw, left: str, right: str = "") -> None:
     top = ctx.height - FOOTER
     draw.line([(0, top), (ctx.width, top)], fill=DARK)
@@ -79,7 +95,7 @@ class LibraryScreen:
     def render(self) -> Image.Image:
         ctx = self.ctx
         image, draw = ctx.blank()
-        self._draw_header(draw)
+        draw_header(ctx, draw, "POKÉDEX")
         books = ctx.books()
         if not books:
             draw.multiline_text(
@@ -103,19 +119,6 @@ class LibraryScreen:
         draw_footer(ctx, draw, "A open   ▲▼ choose", f"{len(books)} books" if books else "")
         return image
 
-    def _draw_header(self, draw: ImageDraw.ImageDraw) -> None:
-        ctx = self.ctx
-        draw.rectangle([0, 0, ctx.width, HEADER - 1], fill=BLACK)
-        # The big blue lens and the three small lights of the Kanto Pokédex.
-        cx, cy, r = 24, HEADER // 2, 14
-        draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=WHITE)
-        draw.ellipse([cx - r + 3, cy - r + 3, cx + r - 3, cy + r - 3], fill=LIGHT)
-        draw.ellipse([cx - 7, cy - 8, cx - 2, cy - 3], fill=WHITE)
-        for i, shade in enumerate((WHITE, LIGHT, DARK)):
-            x = 48 + i * 11
-            draw.ellipse([x, 8, x + 6, 14], fill=shade, outline=WHITE)
-        draw.text((48, HEADER - 8), "POKÉDEX", font=ctx.title_font, fill=WHITE, anchor="ls")
-
     def handle(self, button: Button):
         books = self.ctx.books()
         if button == Button.DOWN and self.selected < len(books) - 1:
@@ -133,13 +136,9 @@ class ReaderScreen:
         self.ctx = ctx
         self.name = name
         self.book = book
-        self.style = TextStyle(
-            body=fonts.load(fonts.SERIF, 17),
-            heading=fonts.load(fonts.SERIF_BOLD, 21),
-            width=ctx.width - MARGIN * 2,
-            height=ctx.height - MARGIN - FOOTER - 6,
-        )
-        self._pages: dict[int, list[Page]] = {}
+        saved = ctx.progress.setting("font_size", DEFAULT_FONT_SIZE)
+        self.font_size = min(max(int(saved), 0), len(FONT_SIZES) - 1)
+        self._set_style()
 
         position = ctx.progress.position(name) or Position()
         chapter = min(position.chapter, len(book.chapter_files) - 1)
@@ -149,7 +148,40 @@ class ReaderScreen:
             forward = self._next_chapter_with_text(chapter, +1)
             self.chapter = forward if forward is not None else self._next_chapter_with_text(chapter, -1)
         self.page = page_index(self.pages(self.chapter), position) if self.chapter is not None else 0
-        self._save()
+        # Where you actually are. Re-layouts (font size changes) find their
+        # page from this, so repeated changes don't drift backwards.
+        self.anchor = position
+        if self.chapter is not None and self.chapter != position.chapter:
+            self._save()
+
+    def _set_style(self) -> None:
+        size = FONT_SIZES[self.font_size]
+        self.style = TextStyle(
+            body=fonts.load(fonts.SERIF, size),
+            heading=fonts.load(fonts.SERIF_BOLD, round(size * 1.25)),
+            width=self.ctx.width - MARGIN * 2,
+            height=self.ctx.height - MARGIN - FOOTER - 6,
+        )
+        self._pages: dict[int, list[Page]] = {}
+
+    def change_font_size(self, step: int) -> None:
+        """Make text bigger (+1) or smaller (-1), staying on the same text."""
+        size = min(max(self.font_size + step, 0), len(FONT_SIZES) - 1)
+        if size == self.font_size:
+            return
+        self.font_size = size
+        self.ctx.progress.set_setting("font_size", size)
+        if self.chapter is None:
+            return self._set_style()
+        self._set_style()
+        self.page = page_index(self.pages(self.chapter), self.anchor)
+
+    def go_to_chapter(self, chapter: int) -> None:
+        if not self.pages(chapter):
+            chapter = self._next_chapter_with_text(chapter, +1)
+        if chapter is not None:
+            self.chapter, self.page = chapter, 0
+            self._save()
 
     def pages(self, chapter: int) -> list[Page]:
         if chapter not in self._pages:
@@ -165,15 +197,17 @@ class ReaderScreen:
         return None
 
     def _save(self) -> None:
+        """Called after moving: the new page's start becomes your place."""
         if self.chapter is not None:
-            self.ctx.progress.save(self.name, self.pages(self.chapter)[self.page].start)
+            self.anchor = self.pages(self.chapter)[self.page].start
+            self.ctx.progress.save(self.name, self.anchor)
 
     def render(self) -> Image.Image:
         ctx = self.ctx
         image, draw = ctx.blank()
         if self.chapter is None:
             draw.text((MARGIN, MARGIN), "This book has no text.", font=ctx.ui_font, fill=BLACK)
-            draw_footer(ctx, draw, "B library")
+            draw_footer(ctx, draw, "A menu   B library")
             return image
         pages = self.pages(self.chapter)
         for line in pages[self.page].lines:
@@ -189,6 +223,8 @@ class ReaderScreen:
             self.ctx.progress.forget_last_book()
             names = [name for name, _ in self.ctx.books()]
             return LibraryScreen(self.ctx, selected=names.index(self.name))
+        if button == Button.A:
+            return MenuScreen(self)
         if self.chapter is None:
             return self
         if button == Button.RIGHT:
@@ -201,7 +237,106 @@ class ReaderScreen:
                 self.page -= 1
             elif (chapter := self._next_chapter_with_text(self.chapter, -1)) is not None:
                 self.chapter, self.page = chapter, len(self.pages(chapter)) - 1
+        else:
+            return self
         self._save()
+        return self
+
+
+class MenuScreen:
+    """A panel over the page: text size, contents, back to the library."""
+
+    ITEMS = ("Text size", "Contents", "Library")
+    ROW = 30
+
+    def __init__(self, reader: ReaderScreen):
+        self.reader = reader
+        self.selected = 0
+
+    def render(self) -> Image.Image:
+        ctx = self.reader.ctx
+        image = self.reader.render()
+        draw = ImageDraw.Draw(image)
+        top = ctx.height - FOOTER - len(self.ITEMS) * self.ROW - 12
+        draw.rectangle([0, top, ctx.width, ctx.height], fill=WHITE)
+        draw.rectangle([0, top, ctx.width, top + 3], fill=BLACK)
+        for i, label in enumerate(self.ITEMS):
+            y = top + 8 + i * self.ROW
+            ink = BLACK
+            if i == self.selected:
+                draw.rectangle([MARGIN // 2, y, ctx.width - MARGIN // 2, y + self.ROW - 4], fill=BLACK)
+                ink = WHITE
+            middle = y + (self.ROW - 4) // 2
+            draw.text((MARGIN, middle), label, font=ctx.ui_bold, fill=ink, anchor="lm")
+            if label == "Text size":
+                sizes = "  ".join(("\u25cf" if n == self.reader.font_size else "\u25cb")
+                                  for n in range(len(FONT_SIZES)))
+                draw.text((ctx.width - MARGIN, middle), f"\u25c0 {sizes} \u25b6",
+                          font=ctx.ui_font, fill=ink, anchor="rm")
+        draw_footer(ctx, draw, "A choose   B close", "\u25c0 \u25b6 size")
+        return image
+
+    def handle(self, button: Button):
+        label = self.ITEMS[self.selected]
+        if button == Button.DOWN:
+            self.selected = min(self.selected + 1, len(self.ITEMS) - 1)
+        elif button == Button.UP:
+            self.selected = max(self.selected - 1, 0)
+        elif button in (Button.LEFT, Button.RIGHT) and label == "Text size":
+            self.reader.change_font_size(+1 if button == Button.RIGHT else -1)
+        elif button == Button.B:
+            return self.reader
+        elif button == Button.A:
+            if label == "Contents":
+                return ContentsScreen(self.reader)
+            if label == "Library":
+                return self.reader.handle(Button.B)
+            return self.reader
+        return self
+
+
+class ContentsScreen:
+    """The book's chapters. A jumps to one, B goes back to the page."""
+
+    ROW = 32
+
+    def __init__(self, reader: ReaderScreen):
+        self.reader = reader
+        self.entries = reader.book.toc()
+        current = reader.chapter or 0
+        # The last entry at or before the current chapter.
+        self.selected = max((i for i, e in enumerate(self.entries) if e.chapter <= current), default=0)
+        self.top = 0
+
+    def render(self) -> Image.Image:
+        ctx = self.reader.ctx
+        image, draw = ctx.blank()
+        draw_header(ctx, draw, "CONTENTS")
+        if not self.entries:
+            draw.text((MARGIN, HEADER + MARGIN), "This book has no chapters.", font=ctx.ui_font, fill=BLACK)
+        visible = (ctx.height - HEADER - FOOTER) // self.ROW
+        self.top = min(max(self.top, self.selected - visible + 1), self.selected)
+        for row, entry in enumerate(self.entries[self.top:self.top + visible]):
+            y = HEADER + row * self.ROW
+            ink = BLACK
+            if self.top + row == self.selected:
+                draw.rectangle([0, y, ctx.width, y + self.ROW - 1], fill=BLACK)
+                ink = WHITE
+            draw.text((MARGIN, y + self.ROW // 2), _fit(entry.title, ctx.ui_bold, ctx.width - MARGIN * 2),
+                      font=ctx.ui_bold, fill=ink, anchor="lm")
+        draw_footer(ctx, draw, "A go   B back", f"{self.selected + 1}/{len(self.entries)}" if self.entries else "")
+        return image
+
+    def handle(self, button: Button):
+        if button == Button.DOWN:
+            self.selected = min(self.selected + 1, max(len(self.entries) - 1, 0))
+        elif button == Button.UP:
+            self.selected = max(self.selected - 1, 0)
+        elif button == Button.B:
+            return self.reader
+        elif button == Button.A and self.entries:
+            self.reader.go_to_chapter(self.entries[self.selected].chapter)
+            return self.reader
         return self
 
 

@@ -19,13 +19,16 @@ Put `.epub` files in the books folder. Free public-domain books are at
 
 A 300×400 window stands in for the e-paper screen, drawn in its 4 gray levels.
 
-| Key | Button | Library | Reading |
-|---|---|---|---|
-| ↑ ↓ | D-pad | choose a book | — |
-| ← → | D-pad | — | previous / next page |
-| Z or Enter | A | open book | — |
-| X, Backspace or Esc | B | — | back to the library |
-| Q | — | quit | quit |
+| Key | Button | Library | Reading | Menu | Contents |
+|---|---|---|---|---|---|
+| ↑ ↓ | D-pad | choose a book | — | choose an item | choose a chapter |
+| ← → | D-pad | — | previous / next page | text size smaller / bigger | — |
+| Z or Enter | A | open book | open the menu | select | go to chapter |
+| X, Backspace or Esc | B | — | back to the library | close | back to the page |
+| Q | — | quit | quit | quit | quit |
+
+The menu has **Text size** (5 sizes, remembered for all books), **Contents**
+(the book's table of contents) and **Library**.
 
 Your page in every book is saved in `~/.pokedex-reader/progress.json`. If you quit
 while reading, the reader reopens that book at your page next time, the way it
