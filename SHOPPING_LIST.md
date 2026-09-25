@@ -10,8 +10,8 @@ Tools already owned: soldering iron, multimeter, wire strippers, screwdrivers.
 |---|---|---|---|---|
 | 1 | Raspberry Pi Zero 2 W (with pre-soldered header if available — "Zero 2 WH") | "Raspberry Pi Zero 2 WH" from an official reseller | $15–18 | Header saves soldering 40 pins. |
 | 2 | microSD card, 32 GB, reputable brand | "SanDisk 32GB microSD A1" | $8 | |
-| 3 | 4.2" e-paper with frontlight + touch, **GDEY042T81-FT02** | [buyepaper](https://www.buyepaper.com/products/42-inch-e-paper-display-fast-update-morochrome-spi-e-ink-with-touch-and-front-light-gdey042t81-ft02) · [AliExpress](https://www.aliexpress.us/item/3256805324479823.html) · [Good Display](https://www.good-display.com/product/617.html) | $25–40 (unconfirmed) | **Ask for the datasheet** and whether the frontlight LEDs are series or parallel. Order it first: it's the long-lead item. |
-| 4 | Adapter board **DESPI-C02** | Same seller as #3 — "DESPI-C02" | $8 | Connects the panel's 24-pin cable to SPI. |
+| 3 | **Good Display 4.2" e-paper kit**: GDEY042T81-FT02 panel (400×300, front light, I²C touch) + adapter board + ESP32 demo kit | Good Display kit found on Amazon; other sellers: [buyepaper](https://www.buyepaper.com/products/42-inch-e-paper-display-fast-update-morochrome-spi-e-ink-with-touch-and-front-light-gdey042t81-ft02) · [Good Display](https://www.good-display.com/product/617.html) | $35–55 | Check the model name says GDEY042T81-FT02. **Ask for the datasheet** (front-light LEDs series or parallel? FPC contact counts). Use the ESP32 demo to check the panel works before wiring the Pi. Order it first: it takes the longest to arrive. |
+| 4 | ~~Adapter board DESPI-C02~~ | — | $0 | **Included in the kit (#3).** |
 | 5 | Adafruit **PowerBoost 1000C** | [adafruit.com/product/2465](https://www.adafruit.com/product/2465) | $20 | Charges while running. |
 | 6 | Flat LiPo, 3.7 V, 3000–4000 mAh, **with protection circuit and JST-PH connector** | "3.7V 3000mAh LiPo JST PH protected" | $12–18 | Check its size against the battery half (~11 × 15 cm, thin). Match connector polarity to the PowerBoost. |
 | 7 | Tactile buttons, 6×6 mm, assorted heights (for D-pad + A/B) | "6x6mm tactile switch assortment" | $3–5 | D-pad = 4 buttons under one printed cap. |
@@ -22,7 +22,7 @@ Tools already owned: soldering iron, multimeter, wire strippers, screwdrivers.
 | 12 | Neodymium disc magnets, small (e.g. 6×2 mm) | "6x2mm neodymium magnet" | $3 | Lid sensing and closing the clamshell. |
 | 13 | Passive piezo buzzer (small, ~12 mm) | "passive piezo buzzer 3.3V" | $1–2 | Plays the chimes. Driven by PWM on GPIO13 (GPIO12 is the frontlight). Must be **passive**, so it can play different notes. |
 
-**Subtotal now: ~$112–142**
+**Subtotal now: ~$114–149**
 
 ## Order later (power stage 2)
 
@@ -44,4 +44,4 @@ Tools already owned: soldering iron, multimeter, wire strippers, screwdrivers.
 
 ## Total
 
-About **$145–185 + shipping**. That leaves a margin under $200 for one broken or wrong part.
+About **$145–195 + shipping**. At the top end the $200 ceiling gets tight: keep an eye on the kit's price and shipping.
