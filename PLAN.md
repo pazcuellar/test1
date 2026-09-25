@@ -58,25 +58,28 @@ It's unclear whether the panel's 7 LEDs are in **parallel** (~3 V) or **series**
 
 Written in **Python**. Own reader first; KOReader later.
 
-### Version 1 (first working version)
+### Done in software (laptop simulator)
 
 1. Open an EPUB and show its text.
 2. Turn pages back and forth with the D-pad.
 3. Remember the current page per book across sleep and shutdown.
-4. A library screen listing books, with Pokédex styling.
+4. A library screen listing books, with Pokédex styling: No.001 entries, and **seen** / **caught** Pokéballs.
+5. Text size: 5 steps, remembered, with no drift in your place.
+6. Contents: the book's own table of contents, or chapter headings.
+7. Chimes and cover-light animations (`effects.py`), shown and played by the simulator.
+8. Touch: taps on library rows, page thirds, menu items and contents.
+9. A KOReader launcher (`--koreader`) in the book menu and the library menu.
 
 ### Next
 
-- Font size (high priority at 400×300).
-- Chapter list / table of contents.
-- Full theme: library as Pokédex entries (#001 Dune…), startup chime, lens animations, touch.
-- **KOReader** as an "app" launched from the reader's menu; exiting it returns home.
+- **Hardware drivers** once parts arrive: e-paper (SSD1683), D-pad/A/B on GPIO, buzzer PWM, LED PWM, touch (FT6336U over I2C), frontlight PWM with brightness steps.
+- **Porting KOReader** to this screen on the Pi. Running KOReader itself is not done yet.
 - Out of scope for now: images in books, bookmarks, search, dictionary.
 
 ### Architecture rules decided now
 
 - **Display and input sit behind one interface**, with two implementations:
-  - a **desktop simulator**: a 400×300 window, with arrow keys / Z / X standing in for the D-pad and A/B;
+  - a **desktop simulator**: a 300×400 window with the cover lights above it; arrow keys / Z / X stand in for the D-pad and A/B, and mouse clicks are taps;
   - the **e-paper + GPIO** version on the Pi.
 - The reader must be able to **release the screen and input** so another program (KOReader) can take over, then reclaim them.
 

@@ -19,19 +19,19 @@ Tools already owned: soldering iron, multimeter, wire strippers, screwdrivers.
 | 9 | Logic-level N-MOSFET (AO3400 or similar) + assorted resistors | "AO3400 SOT-23" or a through-hole "IRLZ44N"; "resistor kit" | $3–5 | For the frontlight **if** the LEDs are parallel. |
 | 10 | 5 mm or 3 mm LEDs (blue, red, yellow, green) + resistors | "LED assortment 3mm 5mm" | $3 | Lens + status lights. |
 | 11 | Wire, perfboard, female/male headers, M2 screws, M2 heat-set inserts | "30AWG silicone wire", "perfboard", "M2 heat set inserts" | $10 | |
-| 12a | Passive piezo buzzer (small, ~12 mm) | "passive piezo buzzer 3.3V" | $1–2 | Plays the chimes. Driven by PWM on GPIO13 (GPIO12 is the frontlight). Must be **passive**, so it can play different notes. |
 | 12 | Neodymium disc magnets, small (e.g. 6×2 mm) | "6x2mm neodymium magnet" | $3 | Lid sensing and closing the clamshell. |
+| 13 | Passive piezo buzzer (small, ~12 mm) | "passive piezo buzzer 3.3V" | $1–2 | Plays the chimes. Driven by PWM on GPIO13 (GPIO12 is the frontlight). Must be **passive**, so it can play different notes. |
 
-**Subtotal now: ~$110–140**
+**Subtotal now: ~$112–142**
 
 ## Order later (power stage 2)
 
 | # | Part | Search terms | ~Cost | Notes |
 |---|---|---|---|---|
-| 13 | Latching power switch module | "Pololu mini pushbutton power switch" | $6 | Reed switch triggers ON; the Pi triggers OFF via `gpio-poweroff`. Choice not yet verified: confirm it has a separate OFF input. |
-| 14 | Reed switch (normally open, glass or SMD) | "reed switch normally open" | $2 | Uses no power, unlike a hall sensor. |
-| 15 | USB-C breakout board with 5.1 kΩ CC resistors | "USB-C breakout 5.1k CC" | $3 | VBUS → charger; D+/D− → Pi data port. |
-| 16 | *If* the frontlight is a series string: PWM-dimmable LED boost driver board | "LED boost constant current driver PWM dimming" | $3–5 | Only if the datasheet or measurement says ~20 V. |
+| 14 | Latching power switch module | "Pololu mini pushbutton power switch" | $6 | Reed switch triggers ON; the Pi triggers OFF via `gpio-poweroff`. Choice not yet verified: confirm it has a separate OFF input. |
+| 15 | Reed switch (normally open, glass or SMD) | "reed switch normally open" | $2 | Uses no power, unlike a hall sensor. |
+| 16 | USB-C breakout board with 5.1 kΩ CC resistors | "USB-C breakout 5.1k CC" | $3 | VBUS → charger; D+/D− → Pi data port. |
+| 17 | *If* the frontlight is a series string: PWM-dimmable LED boost driver board | "LED boost constant current driver PWM dimming" | $3–5 | Only if the datasheet or measurement says ~20 V. |
 
 **Subtotal later: ~$10–15**
 

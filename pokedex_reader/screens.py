@@ -10,6 +10,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
 from PIL import Image, ImageDraw
 
@@ -33,6 +34,7 @@ class Context:
     height: int
     books_dir: Path
     progress: ProgressStore
+    koreader: list[str] | None = None  # command that starts KOReader
     _books: list[tuple[str, Book]] | None = field(default=None, repr=False)
 
     def __post_init__(self):
@@ -145,7 +147,7 @@ class LibraryScreen:
         seen = sum(1 for name, _ in books
                    if ctx.progress.position(name) or ctx.progress.is_finished(name))
         caught = sum(1 for name, _ in books if ctx.progress.is_finished(name))
-        draw_footer(ctx, draw, "A open   ▲▼ choose",
+        draw_footer(ctx, draw, "A open   B menu" if ctx.koreader else "A open   ▲▼ choose",
                     f"seen {seen} · caught {caught}" if books else "")
         return image
 
@@ -159,6 +161,9 @@ class LibraryScreen:
             name, book = books[self.selected]
             self.ctx.play(Effect.OPEN_BOOK)
             return ReaderScreen(self.ctx, name, book)
+        elif button == Button.B and (items := koreader_item(self.ctx, self)):
+            self.ctx.play(Effect.SELECT)
+            return MenuScreen(self.ctx, self, items)
         return self
 
     def tap(self, x: int, y: int):
@@ -264,7 +269,7 @@ class ReaderScreen:
             return LibraryScreen(self.ctx, selected=names.index(self.name))
         if button == Button.A:
             self.ctx.play(Effect.SELECT)
-            return MenuScreen(self)
+            return reader_menu(self)
         if self.chapter is None:
             return self
         if button == Button.RIGHT:
@@ -300,76 +305,111 @@ class ReaderScreen:
         return self.handle(Button.A)
 
 
-class MenuScreen:
-    """A panel over the page: text size, contents, back to the library."""
+@dataclass
+class MenuItem:
+    label: str
+    select: Callable[[], object]  # returns the next screen
+    adjust: Callable[[int], None] | None = None  # ◀ ▶ changes a value
+    value: Callable[[], str] | None = None  # shown on the right
+    effect: Effect | None = Effect.SELECT
 
-    ITEMS = ("Text size", "Contents", "Library")
+
+@dataclass(frozen=True)
+class Launch:
+    """Returned instead of a screen: run another program (e.g. KOReader)
+    with the screen and buttons handed over, then show `return_to`."""
+
+    command: list[str]
+    return_to: object
+
+
+class MenuScreen:
+    """A panel of items drawn over another screen. B closes it."""
+
     ROW = 30
 
-    def __init__(self, reader: ReaderScreen):
-        self.reader = reader
+    def __init__(self, ctx: Context, base, items: list[MenuItem]):
+        self.ctx = ctx
+        self.base = base
+        self.items = items
         self.selected = 0
 
     def render(self) -> Image.Image:
-        ctx = self.reader.ctx
-        image = self.reader.render()
+        ctx = self.ctx
+        image = self.base.render()
         draw = ImageDraw.Draw(image)
         top = self._top()
         draw.rectangle([0, top, ctx.width, ctx.height], fill=WHITE)
         draw.rectangle([0, top, ctx.width, top + 3], fill=BLACK)
-        for i, label in enumerate(self.ITEMS):
+        for i, item in enumerate(self.items):
             y = top + 8 + i * self.ROW
             ink = BLACK
             if i == self.selected:
                 draw.rectangle([MARGIN // 2, y, ctx.width - MARGIN // 2, y + self.ROW - 4], fill=BLACK)
                 ink = WHITE
             middle = y + (self.ROW - 4) // 2
-            draw.text((MARGIN, middle), label, font=ctx.ui_bold, fill=ink, anchor="lm")
-            if label == "Text size":
-                sizes = "  ".join(("\u25cf" if n == self.reader.font_size else "\u25cb")
-                                  for n in range(len(FONT_SIZES)))
-                draw.text((ctx.width - MARGIN, middle), f"\u25c0 {sizes} \u25b6",
-                          font=ctx.ui_font, fill=ink, anchor="rm")
-        draw_footer(ctx, draw, "A choose   B close", "\u25c0 \u25b6 size")
+            draw.text((MARGIN, middle), item.label, font=ctx.ui_bold, fill=ink, anchor="lm")
+            if item.value:
+                draw.text((ctx.width - MARGIN, middle), item.value(), font=ctx.ui_font, fill=ink, anchor="rm")
+        hint = "\u25c0 \u25b6 change" if self.items[self.selected].adjust else ""
+        draw_footer(ctx, draw, "A choose   B close", hint)
         return image
 
     def _top(self) -> int:
-        return self.reader.ctx.height - FOOTER - len(self.ITEMS) * self.ROW - 12
+        return self.ctx.height - FOOTER - len(self.items) * self.ROW - 12
 
     def handle(self, button: Button):
-        label = self.ITEMS[self.selected]
+        item = self.items[self.selected]
         if button == Button.DOWN:
-            self.selected = min(self.selected + 1, len(self.ITEMS) - 1)
+            self.selected = min(self.selected + 1, len(self.items) - 1)
         elif button == Button.UP:
             self.selected = max(self.selected - 1, 0)
-        elif button in (Button.LEFT, Button.RIGHT) and label == "Text size":
-            self.reader.change_font_size(+1 if button == Button.RIGHT else -1)
-            self.reader.ctx.play(Effect.PAGE)
+        elif button in (Button.LEFT, Button.RIGHT) and item.adjust:
+            item.adjust(+1 if button == Button.RIGHT else -1)
+            self.ctx.play(Effect.PAGE)
         elif button == Button.B:
-            self.reader.ctx.play(Effect.BACK)
-            return self.reader
+            self.ctx.play(Effect.BACK)
+            return self.base
         elif button == Button.A:
-            if label == "Library":
-                return self.reader.handle(Button.B)
-            self.reader.ctx.play(Effect.SELECT)
-            if label == "Contents":
-                return ContentsScreen(self.reader)
-            return self.reader
+            if item.effect:
+                self.ctx.play(item.effect)
+            return item.select()
         return self
 
     def tap(self, x: int, y: int):
-        """Tap an item to choose it; tap the size row's halves to resize;
-        tap the page above the panel to close."""
+        """Tap an item to choose it; tap the left or right side of an
+        adjustable item to change it; tap above the panel to close."""
         top = self._top()
         if y < top:
             return self.handle(Button.B)
         row = (y - top - 8) // self.ROW
-        if not 0 <= row < len(self.ITEMS):
+        if not 0 <= row < len(self.items):
             return self
         self.selected = row
-        if self.ITEMS[row] == "Text size":
-            return self.handle(Button.LEFT if x < self.reader.ctx.width * 3 // 4 else Button.RIGHT)
+        if self.items[row].adjust:
+            return self.handle(Button.LEFT if x < self.ctx.width * 3 // 4 else Button.RIGHT)
         return self.handle(Button.A)
+
+
+def koreader_item(ctx: Context, return_to) -> list[MenuItem]:
+    if not ctx.koreader:
+        return []
+    return [MenuItem("KOReader", lambda: Launch(ctx.koreader, return_to))]
+
+
+def reader_menu(reader: ReaderScreen) -> MenuScreen:
+    ctx = reader.ctx
+
+    def sizes() -> str:
+        dots = "  ".join("\u25cf" if n == reader.font_size else "\u25cb" for n in range(len(FONT_SIZES)))
+        return f"\u25c0 {dots} \u25b6"
+
+    return MenuScreen(ctx, reader, [
+        MenuItem("Text size", lambda: reader, adjust=reader.change_font_size, value=sizes),
+        MenuItem("Contents", lambda: ContentsScreen(reader)),
+        *koreader_item(ctx, reader),
+        MenuItem("Library", lambda: reader.handle(Button.B), effect=None),
+    ])
 
 
 class ContentsScreen:

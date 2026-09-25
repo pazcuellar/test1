@@ -24,7 +24,7 @@ A window stands in for the device: a 300×400 screen drawn in the e-paper's 4 gr
 | ↑ ↓ | D-pad | choose a book | — | choose an item | choose a chapter |
 | ← → | D-pad | — | previous / next page | text size smaller / bigger | — |
 | Z or Enter | A | open book | open the menu | select | go to chapter |
-| X, Backspace or Esc | B | — | back to the library | close | back to the page |
+| X, Backspace or Esc | B | KOReader menu (if set up) | back to the library | close | back to the page |
 | Q | — | quit | quit | quit | quit |
 
 **Mouse clicks are taps** on the touchscreen:
@@ -45,7 +45,15 @@ Your page in every book is saved in `~/.pokedex-reader/progress.json`. If you qu
 while reading, the reader reopens that book at your page next time, the way it
 will when you open the lid.
 
-Options: `--landscape` (400×300), `--scale 3` (bigger window), `--state FILE`.
+Options: `--landscape` (400×300), `--scale 3` (bigger window), `--state FILE`,
+`--koreader COMMAND`.
+
+### KOReader
+
+With `--koreader "~/koreader/koreader.sh"` (or whatever starts KOReader on your machine),
+**KOReader** appears in the book menu, and **B** in the library opens a menu with it.
+Choosing it hands the screen and buttons to KOReader. When KOReader exits you're back
+where you were. Without the option, the menus don't show it.
 
 ## Tests
 
