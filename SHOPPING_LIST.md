@@ -8,8 +8,8 @@ Tools already owned: soldering iron, multimeter, wire strippers, screwdrivers.
 
 | # | Part | Search terms / link | ~Cost | Notes |
 |---|---|---|---|---|
-| 1 | Raspberry Pi Zero 2 W (with pre-soldered header if available — "Zero 2 WH") | "Raspberry Pi Zero 2 WH" from an official reseller | $15–18 | Header saves soldering 40 pins. |
-| 2 | microSD card, 32 GB, reputable brand | "SanDisk 32GB microSD A1" | $8 | |
+| 1 | **RasTech Raspberry Pi Zero 2 W kit**: board, mini-HDMI adapter, micro-USB OTG cable, heatsink, 40-pin header (not soldered) | "RasTech Raspberry Pi Zero 2 W kit" | $25–30 | Solder the header yourself (good practice). The HDMI adapter and OTG cable help with first setup. The heatsink is optional; it may not fit in the clamshell. No microSD card or power supply included. Copying books needs a normal micro-USB **data** cable, not the OTG one. |
+| 2 | microSD card, 32 GB, reputable brand | "SanDisk 32GB microSD A1" | $8 | Not included in the Pi kit. |
 | 3 | **Good Display 4.2" e-paper kit**: GDEY042T81-FT02 panel (400×300, front light, I²C touch) + adapter board + ESP32 demo kit | Good Display kit found on Amazon; other sellers: [buyepaper](https://www.buyepaper.com/products/42-inch-e-paper-display-fast-update-morochrome-spi-e-ink-with-touch-and-front-light-gdey042t81-ft02) · [Good Display](https://www.good-display.com/product/617.html) | $35–55 | Check the model name says GDEY042T81-FT02. **Ask for the datasheet** (front-light LEDs series or parallel? FPC contact counts). Use the ESP32 demo to check the panel works before wiring the Pi. Order it first: it takes the longest to arrive. |
 | 4 | ~~Adapter board DESPI-C02~~ | — | $0 | **Included in the kit (#3).** |
 | 5 | Adafruit **PowerBoost 1000C** | [adafruit.com/product/2465](https://www.adafruit.com/product/2465) | $20 | Charges while running. |
@@ -22,7 +22,7 @@ Tools already owned: soldering iron, multimeter, wire strippers, screwdrivers.
 | 12 | Neodymium disc magnets, small (e.g. 6×2 mm) | "6x2mm neodymium magnet" | $3 | Lid sensing and closing the clamshell. |
 | 13 | Passive piezo buzzer (small, ~12 mm) | "passive piezo buzzer 3.3V" | $1–2 | Plays the chimes. Driven by PWM on GPIO13 (GPIO12 is the frontlight). Must be **passive**, so it can play different notes. |
 
-**Subtotal now: ~$114–149**
+**Subtotal now: ~$124–161**
 
 ## Order later (power stage 2)
 
@@ -44,4 +44,4 @@ Tools already owned: soldering iron, multimeter, wire strippers, screwdrivers.
 
 ## Total
 
-About **$145–195 + shipping**. At the top end the $200 ceiling gets tight: keep an eye on the kit's price and shipping.
+About **$155–205 + shipping**. The top end goes over the $200 ceiling. The screen kit's real price and shipping decide it. Power stage 2 (~$10–15) can wait until later if money is tight.
