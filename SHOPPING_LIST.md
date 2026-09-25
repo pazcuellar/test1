@@ -19,6 +19,7 @@ Tools already owned: soldering iron, multimeter, wire strippers, screwdrivers.
 | 9 | Logic-level N-MOSFET (AO3400 or similar) + assorted resistors | "AO3400 SOT-23" or a through-hole "IRLZ44N"; "resistor kit" | $3–5 | For the frontlight **if** the LEDs are parallel. |
 | 10 | 5 mm or 3 mm LEDs (blue, red, yellow, green) + resistors | "LED assortment 3mm 5mm" | $3 | Lens + status lights. |
 | 11 | Wire, perfboard, female/male headers, M2 screws, M2 heat-set inserts | "30AWG silicone wire", "perfboard", "M2 heat set inserts" | $10 | |
+| 12a | Passive piezo buzzer (small, ~12 mm) | "passive piezo buzzer 3.3V" | $1–2 | Plays the chimes. Driven by PWM on GPIO13 (GPIO12 is the frontlight). Must be **passive**, so it can play different notes. |
 | 12 | Neodymium disc magnets, small (e.g. 6×2 mm) | "6x2mm neodymium magnet" | $3 | Lid sensing and closing the clamshell. |
 
 **Subtotal now: ~$110–140**

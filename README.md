@@ -17,7 +17,7 @@ python -m pokedex_reader --books ~/Books
 Put `.epub` files in the books folder. Free public-domain books are at
 [Project Gutenberg](https://www.gutenberg.org) and [Standard Ebooks](https://standardebooks.org).
 
-A 300×400 window stands in for the e-paper screen, drawn in its 4 gray levels.
+A window stands in for the device: a 300×400 screen drawn in the e-paper's 4 gray levels, plus the cover lights above it.
 
 | Key | Button | Library | Reading | Menu | Contents |
 |---|---|---|---|---|---|
@@ -26,6 +26,17 @@ A 300×400 window stands in for the e-paper screen, drawn in its 4 gray levels.
 | Z or Enter | A | open book | open the menu | select | go to chapter |
 | X, Backspace or Esc | B | — | back to the library | close | back to the page |
 | Q | — | quit | quit | quit | quit |
+
+**Mouse clicks are taps** on the touchscreen:
+- Library: tap a book to open it.
+- Reading: tap the left third to go back a page, the right third to go forward, the middle for the menu.
+- Menu: tap an item. On Text size, tap the left side for smaller text and the right side for bigger. Tap the page above the menu to close it.
+- Contents: tap a chapter.
+
+The red strip above the screen is the **cover**: the blue lens and the red, yellow and
+green lights animate, and chimes play through your speakers. In the library, a Pokéball
+outline marks books you've opened (**seen**). A filled Pokéball marks books you've
+finished (**caught**); you get a jingle when you press next on the last page.
 
 The menu has **Text size** (5 sizes, remembered for all books), **Contents**
 (the book's table of contents) and **Library**.
@@ -46,10 +57,11 @@ pytest
 
 | File | What it does |
 |---|---|
-| `pokedex_reader/device.py` | The screen + buttons interface. The only part that changes on the Pi. |
-| `pokedex_reader/simulator.py` | The laptop version of the device (pygame window + keyboard). |
+| `pokedex_reader/device.py` | The interface for the screen, buttons, touch, buzzer and cover lights. The only part that changes on the Pi. |
+| `pokedex_reader/simulator.py` | The laptop version of the device (pygame window, keyboard, mouse, speakers). |
 | `pokedex_reader/epub.py` | Opens EPUBs: title, author, chapters as text blocks. |
 | `pokedex_reader/layout.py` | Wraps text into lines and pages. |
 | `pokedex_reader/screens.py` | The Pokédex library screen and the reading screen. |
 | `pokedex_reader/progress.py` | Saves your place in each book. |
+| `pokedex_reader/effects.py` | Chime notes and cover-light animations, shared by the simulator and the Pi. |
 | `pokedex_reader/app.py` | The main loop. |

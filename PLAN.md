@@ -23,7 +23,8 @@ Decisions below were settled in a `/grill-me` session on 2026-09-25.
 | Books | Copied over **USB** — the Pi presents itself as a USB drive (mass-storage gadget). While plugged in, the reader can't open books. |
 | Lid | Magnet in the lid + **reed switch**. Close → idle (light off); after **30 min** idle → full shutdown. Open → wake, or boot if shut down. |
 | Off switch | Hidden slide switch on the battery lead (hard off). |
-| Cover lights | Blue lens + small lights as **status**: on/waking, charging, battery low, USB transfer. Animations later. |
+| Cover lights | Blue lens + small lights as **status**: on/waking, charging, battery low, USB transfer. Animations defined in `effects.py`. |
+| Chimes | Passive piezo buzzer on GPIO13 (PWM), playing the notes in `effects.py`. |
 
 ### Power — built in stages
 

@@ -1,7 +1,8 @@
 """The library, reading, menu and contents screens.
 
-Each screen draws itself as an image and reacts to a button by returning
-the screen to show next (itself, to stay).
+Each screen draws itself as an image and reacts to a button or a tap by
+returning the screen to show next (itself, to stay). Screens ask for chimes
+and cover-light animations with `ctx.play(effect)`.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from PIL import Image, ImageDraw
 
 from . import fonts
 from .device import BLACK, DARK, LIGHT, WHITE, Button
+from .effects import Effect
 from .epub import Book, EpubError
 from .layout import Page, Position, TextStyle, page_index, paginate
 from .progress import ProgressStore
@@ -34,6 +36,7 @@ class Context:
     _books: list[tuple[str, Book]] | None = field(default=None, repr=False)
 
     def __post_init__(self):
+        self.effects: list[Effect] = []
         self.ui_font = fonts.load(fonts.SANS, 13)
         self.ui_bold = fonts.load(fonts.SANS_BOLD, 15)
         self.title_font = fonts.load(fonts.SANS_BOLD, 20)
@@ -48,6 +51,13 @@ class Context:
                 except EpubError as e:
                     print(f"Skipping unreadable book: {e}", file=sys.stderr)
         return self._books
+
+    def play(self, effect: Effect) -> None:
+        self.effects.append(effect)
+
+    def take_effects(self) -> list[Effect]:
+        effects, self.effects = self.effects, []
+        return effects
 
     def blank(self) -> tuple[Image.Image, ImageDraw.ImageDraw]:
         image = Image.new("L", (self.width, self.height), WHITE)
@@ -74,6 +84,18 @@ def draw_header(ctx: Context, draw: ImageDraw.ImageDraw, title: str) -> None:
         draw.ellipse([x, 8, x + 6, 14], fill=shade, outline=WHITE)
     draw.text((48, HEADER - 8), _fit(title, ctx.title_font, ctx.width - 48 - MARGIN),
               font=ctx.title_font, fill=WHITE, anchor="ls")
+
+
+def draw_pokeball(draw: ImageDraw.ImageDraw, center: tuple[int, int], r: int,
+                  ink: int, paper: int, caught: bool) -> None:
+    """Seen books get an outline; caught (finished) ones a filled top half."""
+    x, y = center
+    box = [x - r, y - r, x + r, y + r]
+    draw.ellipse(box, fill=paper, outline=ink, width=2)
+    if caught:
+        draw.pieslice(box, 180, 360, fill=ink)
+    draw.line([(x - r, y), (x + r, y)], fill=ink, width=2)
+    draw.ellipse([x - 3, y - 3, x + 3, y + 3], fill=paper, outline=ink, width=2)
 
 
 def draw_footer(ctx: Context, draw: ImageDraw.ImageDraw, left: str, right: str = "") -> None:
@@ -104,19 +126,27 @@ class LibraryScreen:
                 font=ctx.ui_font, fill=BLACK, spacing=6)
         visible = (ctx.height - HEADER - FOOTER) // self.ROW
         self.top = min(max(self.top, self.selected - visible + 1), self.selected)
-        for row, (_, book) in enumerate(books[self.top:self.top + visible]):
+        text_width = ctx.width - MARGIN * 2 - 66 - 24
+        for row, (name, book) in enumerate(books[self.top:self.top + visible]):
             number = self.top + row
             y = HEADER + row * self.ROW
-            ink = BLACK
+            ink, paper = BLACK, WHITE
             if number == self.selected:
                 draw.rectangle([0, y, ctx.width, y + self.ROW - 1], fill=BLACK)
-                ink = WHITE
+                ink, paper = WHITE, BLACK
             draw.text((MARGIN, y + 8), f"No.{number + 1:03d}", font=ctx.ui_bold, fill=ink)
-            draw.text((MARGIN + 66, y + 8), _fit(book.title, ctx.ui_bold, ctx.width - MARGIN * 2 - 66),
+            draw.text((MARGIN + 66, y + 8), _fit(book.title, ctx.ui_bold, text_width),
                       font=ctx.ui_bold, fill=ink)
-            draw.text((MARGIN + 66, y + 27), _fit(book.author, ctx.ui_font, ctx.width - MARGIN * 2 - 66),
+            draw.text((MARGIN + 66, y + 27), _fit(book.author, ctx.ui_font, text_width),
                       font=ctx.ui_font, fill=LIGHT if number == self.selected else DARK)
-        draw_footer(ctx, draw, "A open   ▲▼ choose", f"{len(books)} books" if books else "")
+            caught = ctx.progress.is_finished(name)
+            if caught or ctx.progress.position(name):
+                draw_pokeball(draw, (ctx.width - MARGIN - 8, y + self.ROW // 2), 8, ink, paper, caught)
+        seen = sum(1 for name, _ in books
+                   if ctx.progress.position(name) or ctx.progress.is_finished(name))
+        caught = sum(1 for name, _ in books if ctx.progress.is_finished(name))
+        draw_footer(ctx, draw, "A open   ▲▼ choose",
+                    f"seen {seen} · caught {caught}" if books else "")
         return image
 
     def handle(self, button: Button):
@@ -127,7 +157,15 @@ class LibraryScreen:
             self.selected -= 1
         elif button == Button.A and books:
             name, book = books[self.selected]
+            self.ctx.play(Effect.OPEN_BOOK)
             return ReaderScreen(self.ctx, name, book)
+        return self
+
+    def tap(self, x: int, y: int):
+        row = self.top + (y - HEADER) // self.ROW
+        if y >= HEADER and row < len(self.ctx.books()):
+            self.selected = row
+            return self.handle(Button.A)
         return self
 
 
@@ -220,10 +258,12 @@ class ReaderScreen:
 
     def handle(self, button: Button):
         if button == Button.B:
+            self.ctx.play(Effect.BACK)
             self.ctx.progress.forget_last_book()
             names = [name for name, _ in self.ctx.books()]
             return LibraryScreen(self.ctx, selected=names.index(self.name))
         if button == Button.A:
+            self.ctx.play(Effect.SELECT)
             return MenuScreen(self)
         if self.chapter is None:
             return self
@@ -232,15 +272,32 @@ class ReaderScreen:
                 self.page += 1
             elif (chapter := self._next_chapter_with_text(self.chapter, +1)) is not None:
                 self.chapter, self.page = chapter, 0
+            else:  # pressed "next" on the very last page
+                if not self.ctx.progress.is_finished(self.name):
+                    self.ctx.progress.mark_finished(self.name)
+                    self.ctx.play(Effect.CAUGHT)
+                return self
+            self.ctx.play(Effect.PAGE)
         elif button == Button.LEFT:
             if self.page > 0:
                 self.page -= 1
             elif (chapter := self._next_chapter_with_text(self.chapter, -1)) is not None:
                 self.chapter, self.page = chapter, len(self.pages(chapter)) - 1
+            else:
+                return self
+            self.ctx.play(Effect.PAGE)
         else:
             return self
         self._save()
         return self
+
+    def tap(self, x: int, y: int):
+        """Left third: back a page. Right third: forward. Middle: menu."""
+        if x < self.ctx.width // 3:
+            return self.handle(Button.LEFT)
+        if x >= self.ctx.width * 2 // 3:
+            return self.handle(Button.RIGHT)
+        return self.handle(Button.A)
 
 
 class MenuScreen:
@@ -257,7 +314,7 @@ class MenuScreen:
         ctx = self.reader.ctx
         image = self.reader.render()
         draw = ImageDraw.Draw(image)
-        top = ctx.height - FOOTER - len(self.ITEMS) * self.ROW - 12
+        top = self._top()
         draw.rectangle([0, top, ctx.width, ctx.height], fill=WHITE)
         draw.rectangle([0, top, ctx.width, top + 3], fill=BLACK)
         for i, label in enumerate(self.ITEMS):
@@ -276,6 +333,9 @@ class MenuScreen:
         draw_footer(ctx, draw, "A choose   B close", "\u25c0 \u25b6 size")
         return image
 
+    def _top(self) -> int:
+        return self.reader.ctx.height - FOOTER - len(self.ITEMS) * self.ROW - 12
+
     def handle(self, button: Button):
         label = self.ITEMS[self.selected]
         if button == Button.DOWN:
@@ -284,15 +344,32 @@ class MenuScreen:
             self.selected = max(self.selected - 1, 0)
         elif button in (Button.LEFT, Button.RIGHT) and label == "Text size":
             self.reader.change_font_size(+1 if button == Button.RIGHT else -1)
+            self.reader.ctx.play(Effect.PAGE)
         elif button == Button.B:
+            self.reader.ctx.play(Effect.BACK)
             return self.reader
         elif button == Button.A:
-            if label == "Contents":
-                return ContentsScreen(self.reader)
             if label == "Library":
                 return self.reader.handle(Button.B)
+            self.reader.ctx.play(Effect.SELECT)
+            if label == "Contents":
+                return ContentsScreen(self.reader)
             return self.reader
         return self
+
+    def tap(self, x: int, y: int):
+        """Tap an item to choose it; tap the size row's halves to resize;
+        tap the page above the panel to close."""
+        top = self._top()
+        if y < top:
+            return self.handle(Button.B)
+        row = (y - top - 8) // self.ROW
+        if not 0 <= row < len(self.ITEMS):
+            return self
+        self.selected = row
+        if self.ITEMS[row] == "Text size":
+            return self.handle(Button.LEFT if x < self.reader.ctx.width * 3 // 4 else Button.RIGHT)
+        return self.handle(Button.A)
 
 
 class ContentsScreen:
@@ -333,10 +410,19 @@ class ContentsScreen:
         elif button == Button.UP:
             self.selected = max(self.selected - 1, 0)
         elif button == Button.B:
+            self.reader.ctx.play(Effect.BACK)
             return self.reader
         elif button == Button.A and self.entries:
+            self.reader.ctx.play(Effect.SELECT)
             self.reader.go_to_chapter(self.entries[self.selected].chapter)
             return self.reader
+        return self
+
+    def tap(self, x: int, y: int):
+        row = self.top + (y - HEADER) // self.ROW
+        if y >= HEADER and row < len(self.entries):
+            self.selected = row
+            return self.handle(Button.A)
         return self
 
 

@@ -19,6 +19,7 @@ class ProgressStore:
         self.last_book: str | None = data.get("last_book")
         self._positions: dict[str, list[int]] = data.get("books", {})
         self._settings: dict = data.get("settings", {})
+        self._finished: list[str] = data.get("finished", [])
 
     def position(self, book: str) -> Position | None:
         saved = self._positions.get(book)
@@ -28,6 +29,14 @@ class ProgressStore:
         self.last_book = book
         self._positions[book] = [position.chapter, position.block, position.word]
         self._write()
+
+    def is_finished(self, book: str) -> bool:
+        return book in self._finished
+
+    def mark_finished(self, book: str) -> None:
+        if book not in self._finished:
+            self._finished.append(book)
+            self._write()
 
     def setting(self, key: str, default):
         return self._settings.get(key, default)
@@ -46,5 +55,5 @@ class ProgressStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps({"last_book": self.last_book, "books": self._positions,
-                                   "settings": self._settings}))
+                                   "settings": self._settings, "finished": self._finished}))
         os.replace(tmp, self.path)
